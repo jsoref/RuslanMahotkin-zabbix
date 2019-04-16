@@ -82,7 +82,7 @@ Installation Procedure:
 - Install the required scripts.
 
 To handle JSON data in monitoring Elasticsearch, MongoDB and RabbitMQ
-used corrected JSON.sh (http://github.com/dominictarr/JSON.sh).
+used corrected [JSON.sh](http://github.com/dominictarr/JSON.sh).
 
 ## Apache, template mytemplate-apache-trap.xml
 
