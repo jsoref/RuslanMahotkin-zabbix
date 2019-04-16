@@ -1,15 +1,15 @@
 #!/bin/bash
-# Отправка статистики сервера Apache на сервер Zabbix
+# Sending Apache server statistics to Zabbix server
 
-# Получение строки статистики. Параметры curl:
-#  --max-time		максимальное время операции в секундах;
-#  --no-keepalive	отключение keepalive-сообщений в TCP-соединении;
-#  --silent		отключение индикаторов загрузки и сообщений об ошибках;
+# Getting the statistics line. Curl options:
+# --max-time Maximum operation time in seconds;
+# --no-keepalive disabling keepalive messages on a TCP connection;
+# --silent disable load indicators and error messages;
 RespStr=$(/usr/bin/curl --max-time 20 --no-keepalive --silent "http://`/bin/hostname`//as?auto")
-# Статистика недоступна - возврат статуса сервиса - 'не работает'
+# No statistics available - returning service status - 'does not work'
 [ $? != 0 ] && echo 0 && exit 1
 
-# Фильтрация, форматирование и отправка данных статистики серверу Zabbix
+# Filtering, formatting and sending statistics data to Zabbix server
 (cat <<EOF
 $RespStr
 EOF
@@ -30,6 +30,6 @@ EOF
    par["OpenSlotWithNoCurrentProcess"] = "\\."
    for(p in par) print "- apache." p, gsub(par[p], "", $2)
 }' | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
-# Возврат статуса сервиса - 'работает'
+# Returning the status of the service - 'works'
 echo 1
 exit 0

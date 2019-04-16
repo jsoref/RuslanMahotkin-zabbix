@@ -1,19 +1,19 @@
 #!/bin/sh
-# Отправка статистики сервера MongoDB на сервер Zabbix
+# Sending MongoDB server statistics to Zabbix server
 
 MongoAPI(){
-# Запрос к API MongoDB
+# Request for MongoDB API
 
- # Параметры mongo:
- #  --quiet	'тихий' вывод оболочки;
- #  --eval	вычисляемое JavaScript выражение
+ # Mongo options:
+ # --quiet 'silent' shell output;
+ # --eval computed javascript expression
  RespStr=$(/usr/bin/mongo --quiet --eval "print(JSON.stringify($1))" $2 | /etc/zabbix/JSON.sh -l 2>/dev/null)
- # Статистика недоступна - возврат статуса сервиса - 'не работает'
+ # No statistics available - returning service status - 'does not work'
  [ $? != 0 ] && echo 0 && exit 1
 }
 
 
-# Список БД
+# DB list
 MongoAPI 'db.getMongo().getDBs()'
 DBStr=$((cat <<EOF
 $RespStr
@@ -23,11 +23,11 @@ EOF
 }')
 
 
-# В командной строке нет параметров - отправка данных
+# There are no parameters in the command line - sending data
 if [ -z $1 ]; then
- # Статистика сервера
+ # Server statistics
  MongoAPI 'db.serverStatus({cursors: 0, locks:0, wiredTiger: 0})'
- # Фильтрация, форматирование данных статистики
+ # Filtering, formatting statistics data
  OutStr=$((cat <<EOF
 $RespStr
 EOF
@@ -37,41 +37,41 @@ EOF
   print "- mongodb." $1, int($2)
  }')
 
- # Разделитель полей во вводимой строке - для построчной обработки
+ # Field separator in the input line - for line-by-line processing
  IFS=$'\n'
- # Обработка списка БД
+ # Processing the database list
  for db in $DBStr; do
-  # Статистика БД
+  # DB statistics
   MongoAPI 'db.stats()' $db
-  # Форматирование данных статистики БД в строке вывода
+  # Formatting database statistics data in the output line
   for par in $RespStr; do
     OutStr="$OutStr
 - mongodb.${par%%	*}[$db] ${par#*	}"
   done
  done
 
- # Отправка строки вывода серверу Zabbix. Параметры zabbix_sender:
- #  --config		файл конфигурации агента;
- #  --host		имя узла сети на сервере Zabbix;
- #  --input-file	файл данных('-' - стандартный ввод)
+ # Sending output line to Zabbix server. Parameters for zabbix_sender:
+ # --config agent configuration file;
+ # --host hostname on Zabbix server;
+ # --input-file data file ('-' - standard input)
  (cat <<EOF
 $OutStr
 EOF
  ) | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
- # Возврат статуса сервиса - 'работает'
+ # Returning the status of the service - 'works'
  echo 1
  exit 0
 
-# Обнаружение БД
+# DB detection
 elif [ "$1" = 'db' ]; then
- # Разделитель JSON-списка имен
+ # Separator for JSON list of names
  es=''
- # Обработка списка БД
+ # Processing the database list
  for db in $DBStr; do
-  # JSON-форматирование имени БД в строке вывода
+  # JSON formatting of the database name in the output string
   OutStr="$OutStr$es{\"{#DBNAME}\":\"${db#*	}\"}"
   es=","
  done
- # Вывод списка БД в формате JSON
+ # Listing database in JSON format
  echo -e "{\"data\":[$OutStr]}"
 fi

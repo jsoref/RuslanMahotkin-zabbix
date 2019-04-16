@@ -1,72 +1,72 @@
 #!/bin/sh
-# Отправка статистики сервера RabbitMQ на сервер Zabbix
+# Sending RabbitMQ server statistics to Zabbix server
 
 CurlAPI(){
-# Запрос к API RabbitMQ
+# Request to PabbitMQ API
 
- # Параметры curl:
- #  --max-time		максимальное время операции в секундах;
- #  --no-keepalive	отключение keepalive-сообщений в TCP-соединении;
- #  --silent		отключение индикаторов загрузки и сообщений об ошибках;
- #  --ciphers		список используемых наборов шифров;
- #  --insecure		отключение проверки сертификата HTTPS-сервера;
- #  --tlsv1.2		использование TLSv1.2;
- #  --user		'пользователь:пароль' аутентификации на сервере
- RespStr=$(/usr/bin/curl --max-time 20 --no-keepalive --silent --ciphers ecdhe_rsa_aes_128_gcm_sha_256 --insecure --tlsv1.2 --user Пользователь_мониторинга:Пароль_мониторинга "https://127.0.0.1:15672/api/$1" | /etc/zabbix/JSON.sh -l 2>/dev/null)
- # Статистика недоступна - возврат статуса сервиса - 'не работает'
+ # Curl options:
+ # --max-time Maximum operation time in seconds;
+ # --no-keepalive disabling keepalive messages on a TCP connection;
+ # --silent disable load indicators and error messages;
+ # --ciphers list of used cipher suites;
+ # --insecure disabling verification of the HTTPS server certificate;
+ # - tlsv1.2 using TLSv1.2;
+ # --user 'user: password' authentication on server
+ RespStr=$(/usr/bin/curl --max-time 20 --no-keepalive --silent --ciphers ecdhe_rsa_aes_128_gcm_sha_256 --insecure --tlsv1.2 --user Monitoring_user:Monitoring_password "https://127.0.0.1:15672/api/$1" | /etc/zabbix/JSON.sh -l 2>/dev/null)
+ # No statistics available - returning service status - 'does not work'
  [ $? != 0 ] && echo 0 && exit 1
 }
 
 
-# Строка вывода
+# Output line
 OutStr=''
-# Разделитель полей во вводимой строке - для построчной обработки
+# Field separator in the input line - for line-by-line processing
 IFS=$'\n'
-# В командной строке нет параметров - отправка данных
+# There are no parameters in the command line - sending data
 if [ -z $1 ]; then
- # Общая статистика
+ # General Statistics
  CurlAPI 'overview?columns=message_stats,queue_totals,object_totals'
- # Форматирование данных общей статистики в строке вывода
+ # Formatting general statistics data in the output line
  for par in $RespStr; do
   OutStr="$OutStr- rabbitmq.${par/	/ }\n"
  done
 
- # Список очередей
+ # Queue list
  CurlAPI 'queues?columns=name'
  QueueStr=$RespStr
- # Обработка списка очередей
+ # Processing the queue list
  for q in $QueueStr; do
-  # Имя очереди
+  # Queue name
   qn=${q#*	}
-  # Статистика очереди
+  # Queue statistics
   CurlAPI "queues/%2f/$qn?columns=message_stats,memory,messages,messages_ready,messages_unacknowledged,consumers"
-  # Форматирование данных статистики очереди в строке вывода
+  # Formatting queue statistics data in the output string
   for par in $RespStr; do
    OutStr="$OutStr- rabbitmq.${par%%	*}[$qn] ${par#*	}\n"
   done
  done
 
- # Отправка строки вывода серверу Zabbix. Параметры zabbix_sender:
- #  --config		файл конфигурации агента;
- #  --host		имя узла сети на сервере Zabbix;
- #  --input-file	файл данных('-' - стандартный ввод)
+ # Sending output line to Zabbix server. Parameters for zabbix_sender:
+ # --config agent configuration file;
+ # --host hostname on Zabbix server;
+ # --input-file data file ('-' - standard input)
  echo -en $OutStr | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
- # Возврат статуса сервиса - 'работает'
+ # Returning the status of the service - 'works'
  echo 1
  exit 0
 
-# Обнаружение очередей
+# Queue detection
 elif [ "$1" = 'queues' ]; then
- # Список очередей
+ # Queue list
  CurlAPI 'queues?columns=name'
- # Разделитель JSON-списка имен
+ # Separator for JSON list of names
  es=''
- # Обработка списка очередей
+ # Processing the queue list
  for q in $RespStr; do
-  # JSON-форматирование имени очереди в строке вывода
+  # JSON formatting queue name in output string
   OutStr="$OutStr$es{\"{#QUEUENAME}\":\"${q#*	}\"}"
   es=","
  done
- # Вывод списка очередей в формате JSON
+ # Listing queues in JSON format
  echo -e "{\"data\":[$OutStr]}"
 fi

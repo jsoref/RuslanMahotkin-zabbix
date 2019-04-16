@@ -1,48 +1,48 @@
 #!/usr/bin/perl -w
-# Вывод добавленной с последнего запуска сценария части файла журнала
+# Output of the part of the log file added since the last run of the script
 
 use strict;
 use Getopt::Long;
 
 
-# Хэш опций командной строки
+# Hash command line options
 my %Opts = ();
-# Обработка командной строки
+# Command line processing
 GetOptions(\%Opts, 'logfile=s', 'offset=s');
 $Opts{logfile} and $Opts{offset} or
- print(STDERR "Ошибка: параметры --logfile=журнал --offset=смещение\n") and
+ print(STDERR "Error: parameters --logfile=log --offset=offset\n") and
  exit(66);
 
-# Открытие файла журнала, номер и размер файла журнала
+# Open log file, log file number and size
 open(LOGFILE, $Opts{logfile}) and my($ino, $size) = (stat($Opts{logfile}))[1, 7]
- or print(STDERR "Ошибка: открытие файла '$Opts{logfile}'\n") and exit 66;
+ or print(STDERR "Error: opening file '$Opts{logfile}'\n") and exit 66;
 
-# Получение номера файла журнала и смещения в нем из файла смещения
+# Getting the number of the log file and the offset in it from the offset file
 my($inode, $offset);
 open(OFFSET, $Opts{offset}) and $_ = <OFFSET> and close(OFFSET) and
  ($inode, $offset) = /^(\d+)\t(\d+)$/ or ($inode, $offset) = (0, 0);
 
-# Номер файла журнала не изменился
+# Log file number has not changed
 if($inode == $ino){
- # Файл журнала не изменился - выход
+ # Log file has not changed - exit
  $offset == $size and exit(0);
- # Смещение меньше размера файла журнала и позиция в файле журнала - смещение
- # или аналогично первому запуску
+ # Offset less than the size of the log file and position in the log file - offset
+ # or similar to the first launch
  $offset < $size and seek(LOGFILE, $offset, 0) or $inode = 0;
 }
 
-# Сохранен номер файла журнала - запуск не первый
+# Saved log file number - start is not first
 if($inode){
- # Вывод строк журнала
+ # Show log lines
  while(<LOGFILE>){ print $_; }
- # Смещение в файле журнала после последней строки
+ # Offset in log file after last line
  $size = tell(LOGFILE);
 }
-# Закрытие файла журнала
+# Close log file
 close(LOGFILE);
 
-# Сохранение номера и смещения файла журнала в файле смещения
+# Store the number and offset of the log file in the offset file
 open(OFFSET, ">$Opts{offset}") and print(OFFSET "$ino\t$size") and close(OFFSET)
- or print(STDERR "Ошибка: файл смещения $Opts{offset}\n") and exit(73);
+ or print(STDERR "Error: $Opts{offset} offset file\n") and exit(73);
 
 exit 0;

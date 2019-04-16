@@ -1,72 +1,72 @@
 #!/bin/bash
-# Отправка статистики сервера Sphinx на сервер Zabbix
+# Sending Sphinx server statistics to Zabbix server
 
 SphinxAPI(){
-# Запрос к API Sphinx
+# Request to Sphinx API
 
- # Параметры mysql:
- #  --host		имя/адрес соединения;
- #  --port		порт соединения;
- #  --skip-column-names	отсутствие имен столбцов в выводе;
- #  --execute		выполнение команды и выход, выключает --force и историю
- RespStr=$(/usr/bin/mysql --host=127.0.0.1 --port=9306 --skip-column-names --execute="SHOW $1;" 2>/dev/null)
- # Статистика недоступна - возврат статуса сервиса - 'не работает'
+ # Mysql options:
+ # --host name / address of the connection;
+ # --port connection port;
+ # --skip-column-names no column names in the output;
+ # --execute command execution and exit, turn off --force and history
+   RespStr=$(/usr/bin/mysql --host=127.0.0.1 --port=9306 --skip-column-names --execute="SHOW $1;" 2>/dev/null)
+ # No statistics available - returning service status - 'does not work'
  [ $? != 0 ] && echo 0 && exit 1
 }
 
 
-# Список индексов
+# Index list
 SphinxAPI 'TABLES'
 IndexStr=$((cat <<EOF
 $RespStr
 EOF
 ) | awk -F\\t '$2~/^local$/ { print $1}')
 
-# В командной строке нет параметров - отправка данных
+# There are no parameters in the command line - sending data
 if [ -z $1 ]; then
- # Статистика сервера
+ # Server statistics
  SphinxAPI 'STATUS'
- # Форматирование данных статистики
+ # Formatting statistics data
  OutStr=$((cat <<EOF
 $RespStr
 EOF
  ) | awk -F\\t '{ print "- sphinx." $1, $2 }')
 
- # Разделитель полей во вводимой строке - для построчной обработки
+ # Field separator in the input line - for line-by-line processing
  IFS=$'\n'
- # Обработка списка индексов
+ # Processing index list
  for ind in $IndexStr; do
-  # Статистика индекса
+  # Index statistics
   SphinxAPI "INDEX $ind STATUS"
-  # Форматирование данных статистики индекса в строке вывода
+  # Formatting index statistics data in the output line
   for par in $RespStr; do
     OutStr="$OutStr
 - sphinx.${par%%	*}[$ind] ${par#*	}"
   done
  done
 
- # Отправка строки вывода серверу Zabbix. Параметры zabbix_sender:
- #  --config		файл конфигурации агента;
- #  --host		имя узла сети на сервере Zabbix;
- #  --input-file	файл данных('-' - стандартный ввод)
- (cat <<EOF
+ # Sending output line to Zabbix server. Parameters for zabbix_sender:
+ # --config agent configuration file;
+ # --host hostname on Zabbix server;
+ # --input-file data file ('-' - standard input)
+  (cat <<EOF
 $OutStr
 EOF
  ) | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
- # Возврат статуса сервиса - 'работает'
+ # Returning the status of the service - 'works'
  echo 1
  exit 0
 
-# Обнаружение индексов
+# Index detection
 elif [ "$1" = 'indexes' ]; then
- # Разделитель JSON-списка имен
+ # Separator for JSON list of names
  es=''
- # Обработка списка индексов
+ # Processing index list
  for ind in $IndexStr; do
-  # JSON-форматирование имени индекса в строке вывода
+  # JSON formatting of the index name in the output string
   OutStr="$OutStr$es{\"{#INDEXNAME}\":\"${ind#*	}\"}"
   es=","
  done
- # Вывод списка очередей в формате JSON
+ # Listing queues in JSON format
  echo -e "{\"data\":[$OutStr]}"
 fi

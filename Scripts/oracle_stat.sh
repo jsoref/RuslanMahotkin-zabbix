@@ -1,81 +1,81 @@
 #!/bin/sh
-# Отправка статистики сервера Oracle на сервер Zabbix. Параметры:
-#  1 - SID БД или 'tablespaces' для обнаружения табличных пространств
+# Sending Oracle server statistics to Zabbix server. Options:
+# 1 - DB SID or 'tablespaces' for detecting table spaces
 
 ExecSql(){
-# Выполнение sql-запроса. Параметры: 1 - строка запроса
+# Execute sql query. Parameters: 1 - query string
 
  ResStr=$(sqlplus -s /nolog <<EOF
 whenever sqlerror exit failure
 set verify off echo off feedback off heading off pagesize 0 trimout on trimspool on termout off
-conn Пользователь_мониторинга/Пароль_мониторинга
+conn monitoring_user / password_monitoring
 column retvalue format a15
 $1
 EOF
 )
- # Ошибка
+ # Mistake
  [ $? != 0 ] && exit 1
 }
 
 
-# Настройка Oracle-окружения
+# Setting up an Oracle environment
 . /etc/zabbix/oraenv
 
-# В командной строке нет параметров - обнаружение БД
+# There are no parameters in the command line - database detection
 if [ -z $1 ]; then
- # Получение строки списка имен БД
+ # Getting the string of the list of database names
  DBStr=$(awk -F: '$1~/^[A-Za-z]+$/ { print $1 }' /etc/oratab 2>/dev/null)
- # Ошибка
+ # Mistake
  [ $? != 0 ] && exit 1
- # Разделитель JSON-списка
+ # JSON list delimiter
  es=''
- # Обработка списка
+ # List processing
  for db in $DBStr; do
-  # JSON-форматирование имени в строке вывода
+  # JSON formatting of the name in the output string
   OutStr="$OutStr$es{\"{#DBNAME}\":\"$db\"}"
   es=","
  done
- # Вывод списка в формате JSON
+ # List output in JSON format
  echo "{\"data\":[$OutStr]}"
 
-# Обнаружение табличных пространств
+# Tablespace detection
 elif [ "$1" = 'tablespaces' ]; then
- # Получение строки списка имен БД
+ # Getting the string of the list of database names
  DBStr=$(awk -F: '$1~/^[A-Za-z]+$/ { print $1 }' /etc/oratab 2>/dev/null)
- # Ошибка
+ # Mistake
  [ $? != 0 ] && exit 1
- # Разделитель JSON-списка
+ # JSON list delimiter
  es=''
- # Обработка списка
+ # List processing
  for db in $DBStr; do
-  # SID БД
+  # SID DB
   export ORACLE_SID=$db
-  # Получение списка имен табличных пространств
+  # Getting a list of tablespace names
   ExecSql 'SELECT tablespace_name FROM dba_tablespaces;'
-  # Обработка списка
+  # List processing
   for ts in $ResStr; do
-   # JSON-форматирование имени в строке вывода
+   # JSON formatting of the name in the output string
    OutStr="$OutStr$es{\"{#DBNAME}\":\"$db\",\"{#TSNAME}\":\"$ts\"}"
    es=","
   done
  done
- # Вывод списка в формате JSON
+ # List output in JSON format
  echo "{\"data\":[$OutStr]}"
 
-# Статистика БД
+# DB statistics
 else
- # SID БД
+ # SID DB
  db=$1
  export ORACLE_SID=$1
 
- # Форматы вывода чисел
+ # Formats output numbers
  fmint='FM99999999999999990'
  fmfloat='FM99999990.9999'
- # SQL-подстроки получения значения статистики
+ # SQL substrings for obtaining statistics values
  ValueSysStatStr=" to_char(value, '$fmint') FROM v\$sysstat WHERE name = "
  TimeWaitedSystemEventStr=" to_char(time_waited, '$fmint') FROM v\$system_event se, v\$event_name en WHERE se.event(+) = en.name AND en.name = "
  ValueResourceLimitStr=" '$fmint') FROM v\$resource_limit WHERE resource_name = "
- # Массив SQL-запросов значений элементов данных
+ # SQL array of data element values
  aParSql=(
 "'checkactive', to_char(case when inst_cnt > 0 then 1 else 0 end,'$fmint')
   FROM  (select count(*) inst_cnt FROM v\$instance
@@ -158,24 +158,24 @@ else
 "'latchfree',$TimeWaitedSystemEventStr'latch free'"
  )
 
- # Формирование строки запросов значений элементов данных из массива
+ # Forming a string of queries for the values of data elements from an array
  SqlStr=''
  for p in "${aParSql[@]}"; do
   SqlStr="${SqlStr}SELECT ${p};
 "
  done
 
- # Получение и добавление в строку вывода значений элементов данных
+ # Receiving and adding to the output line the values of data elements
  OutStr=''
  ExecSql "$SqlStr"
- # Разделитель полей во вводимой строке - для построчной обработки
+ # Field separator in the input line - for line-by-line processing
  IFS=$'\n'
  for par in $ResStr; do
-  # Проверка наличия значения
+  # Validation of the value
   [ $par == ${par#* } ] || OutStr="$OutStr- oracle.${par%% *}[$db] ${par#* }\n"
  done
 
- # Получение данных по табличным пространствам
+ # Retrieving data on tablespaces
  ExecSql "SELECT df.tablespace_name || ' ' || totalspace || ' ' || nvl(freespace, 0)
   FROM
   (SELECT tablespace_name, SUM(bytes) totalspace
@@ -194,22 +194,22 @@ else
     FROM v\$sort_segment) ss
   WHERE tf.tablespace_name = ss.tablespace_name;"
 
- # Добавление данных по табличным пространствам в строку вывода
+ # Adding data on table spaces to the output string
  for par in $ResStr; do
-  # Имя табличного пространства
+  # Name of tablespace
   ts=${par%% *}
-  # Выделение значений полного и свободного размеров табличного пространства
+  # Allocation of full and free table space sizes
   par=${par#* }
   OutStr="$OutStr- oracle.tablespace.size[$db,$ts] ${par%% *}\n"
   OutStr="$OutStr- oracle.tablespace.free[$db,$ts] ${par#* }\n"
  done
 
- # Отправка строки вывода серверу Zabbix. Параметры zabbix_sender:
- #  --config		файл конфигурации агента;
- #  --host		имя узла сети на сервере Zabbix;
- #  --input-file	файл данных('-' - стандартный ввод)
+ # Sending output line to Zabbix server. Parameters for zabbix_sender:
+ # --config agent configuration file;
+ # --host hostname on Zabbix server;
+ # --input-file data file ('-' - standard input)
  echo -en $OutStr | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
- # Возврат статуса сервиса - 'работает'
+ # Returning the status of the service - 'works'
  echo 1
  exit 0
 fi

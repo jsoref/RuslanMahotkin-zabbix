@@ -1,22 +1,22 @@
 #!/bin/sh
-# Отправка статистики сервера ElasticSearch на сервер Zabbix
+# Sending statistics of ElasticSearch server to Zabbix server
 
 CurlAPI(){
-# Запрос к API ElasticSearch
+# Request for ElasticSearch API
 
- # Параметры curl:
- #  --max-time		максимальное время операции в секундах;
- #  --no-keepalive	отключение keepalive-сообщений в TCP-соединении;
- #  --silent		отключение индикаторов загрузки и сообщений об ошибках;
+ # Curl options:
+ # --max-time Maximum operation time in seconds;
+ # --no-keepalive disabling keepalive messages on a TCP connection;
+ # --silent disable load indicators and error messages;
  RespStr=$(/usr/bin/curl --max-time 20 --no-keepalive --silent "http://127.0.0.1:9200/$1" | /etc/zabbix/JSON.sh -l 2>/dev/null)
- # Статистика недоступна - возврат статуса сервиса - 'не работает'
+ # No statistics available - returning service status - 'does not work'
  [ $? != 0 ] && echo 0 && exit 1
 }
 
 
-# Состояние кластера
+# Cluster status
 CurlAPI '_cluster/health'
-# Фильтрация, форматирование данных статистики
+# Filtering, formatting statistics data
 OutStr=$((cat <<EOF
 $RespStr
 EOF
@@ -27,9 +27,9 @@ EOF
  print "- elasticsearch.cluster." $1, int($2)
 }')
 
-# Статистика узла
+# Node statistics
 CurlAPI '_nodes/_local/stats/indices,jvm'
-# Фильтрация, форматирование данных статистики
+# Filtering, formatting statistics data
 OutStr1=$((cat <<EOF
 $RespStr
 EOF
@@ -38,15 +38,15 @@ EOF
  print "- elasticsearch.nodes." $1, int($2)
 }')
 
-# Отправка строки вывода серверу Zabbix. Параметры zabbix_sender:
-#  --config		файл конфигурации агента;
-#  --host		имя узла сети на сервере Zabbix;
-#  --input-file		файл данных('-' - стандартный ввод)
+# Sending output line to Zabbix server. Parameters for zabbix_sender:
+# --config agent configuration file;
+# --host hostname on Zabbix server;
+# --input-file data file ('-' - standard input)
 (cat <<EOF
 $OutStr
 $OutStr1
 EOF
 ) | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
-# Возврат статуса сервиса - 'работает'
+# Returning the status of the service - 'works'
 echo 1
 exit 0

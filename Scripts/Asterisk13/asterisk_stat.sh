@@ -1,8 +1,8 @@
 #!/bin/sh
-# Отправка статистики сервера Asterisk на сервер Zabbix
+# Sending Asterisk server statistics to Zabbix server
 
-# Массив пар строк команда Asterisk  - строка awk-программы для обработки строки
-# ответа команды
+# Array of pairs of lines Asterisk command - a string of an awk program for processing a string
+# team response
 aComAwk=(
  'core show uptime seconds' '/System uptime:/ { print "uptime", int($3) }'
  'core show threads' '/threads listed/ { print "threads", int($1) }'
@@ -18,62 +18,63 @@ aComAwk=(
  'iax2 show registry' '/IAX2 registrations/ { print "iax2.registrations", int($1) } BEGIN { r = 0 } /Registered/ { r += 1 } END { print "iax2.registered", int(r) }'
 )
 
-# Формирование строки команд Asterisk из строк команд массива
+# Forming a line of Asterisk commands from strings of array commands
 CommandStr=$(
  for(( i = 0; i < ${#aComAwk[@]}; i += 2 )); do
   echo -n "Action: command\r\nCommand: ${aComAwk[i]}\r\n\r\n"
  done
 )
 
-# Выполнение команд Asterisk через AMI интерфейс
-ResStr=$(/bin/echo -e "Action: Login\r\nUsername: Пользователь_мониторинга\r\nSecret: Пароль_мониторинга\r\nEvents: off\r\n\r\n${CommandStr}Action: Logoff\r\n\r\n" | /usr/bin/nc 127.0.0.1 5038 2>/dev/null)
-# Статистика недоступна - возврат статуса сервиса - 'не работает'
+# Run Asterisk commands via AMI interface
+ResStr=$(/bin/echo -e "Action: Login\r\nUsername: Monitoring_User\r\nSecret: Monitoring_password\r\nEvents: off\r\n\r\n${CommandStr}Action: Logoff\r\n\r\n" | /usr/bin/nc 127.0.0.1 5038 2>/dev/null)
+
+# No statistics available - returning service status - 'does not work'
 [ $? != 0 ] && echo 0 && exit 1
 
-# Индекс строки awk-программ в массиве
+# Index of the string of awk programs in an array
 iAwk=1
-# Разделитель полей во вводимой строке - для построчной обработки
+# Field separator in the input line - for line-by-line processing
 IFS=$'\n'
-# Строка вывода
+# Output line
 OutStr=$(
- # Построчная обработка строки результатов выполнения команд
+ # Line by line processing the results of command execution
  for rs in $ResStr; do
-  # Строка начала подстроки результата выполнения команды
+  # Start string substring of the result of the command execution
   if [ "$rs" = "Response: Follows"$'\r' ]; then
-   # Сохранение позиции начала подстроки результата в строке результатов
+   # Save the position of the start of the result substring in the result string
    begin=$pos
-  # Строка конца подстроки результата выполнения команды
+  # End string of substring of the result of the command execution
   elif [ "$rs" = '--END COMMAND--'$'\r' ]; then
-   # Выполнение awk-программы над подстрокой результата выполнения команды
+   # Running an awk program on a substring of the result of the command execution
    (cat <<EOF
 ${ResStr:$begin:$pos-$begin}
 EOF
    ) | awk "${aComAwk[iAwk]}"
-   # Переключение индекса строки awk-программы в массиве на следующую
+   # Switching the index of an awk program line in an array to the next
    let "iAwk+=2"
   fi
-  # Позиция начала следующей строки в строке результатов
+  # Position to start next line in result row
   let "pos+=${#rs}+1"
- # Вставка в начало каждой строки
+ # Insert at the beginning of each line
  done | awk '{ print "- asterisk."$0 }'
 )
 
-# Идентификатор процесса Asterisk из PID-файла
+# ID of the Asterisk process from the PID file
 pid=$(/bin/cat /var/run/asterisk/asterisk.pid 2>/dev/null)
-# PID-файл отсутствует - возврат статуса сервиса - 'не работает'
+# PID-file is missing - returning service status - 'does not work'
 [ -z "$pid" ] && echo 0 && exit 1
-# Строка вывода использования CPU и памяти процессом Asterisk
+# Output line of CPU and memory usage by the Asterisk process
 OutStr1=$((/bin/ps --no-headers --pid $pid --ppid $pid -o pcpu,rssize || echo 0 0) | awk '{ c+=$1; m+=$2 } END { print "- asterisk.pcpu", c; print "- asterisk.memory", m*1024 }')
 
-# Отправка строки вывода серверу Zabbix. Параметры zabbix_sender:
-#  --config		файл конфигурации агента;
-#  --host		имя узла сети на сервере Zabbix;
-#  --input-file		файл данных('-' - стандартный ввод)
+# Sending output line to Zabbix server. Parameters for zabbix_sender:
+# --config agent configuration file;
+# --host hostname on Zabbix server;
+# --input-file data file ('-' - standard input)
 (cat<<EOF
 $OutStr
 $OutStr1
 EOF
 ) | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
-# Возврат статуса сервиса - 'работает'
+# Returning the status of the service - 'works'
 echo 1
 exit 0

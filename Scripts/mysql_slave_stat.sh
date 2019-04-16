@@ -1,15 +1,15 @@
 #!/bin/bash
-# Отправка статистики репликации сервера MySQL на сервер Zabbix
+# Sending MySQL server replication statistics to Zabbix server
 
-# Получение строки статистики. Параметры mysql:
-#  --user		MySQL-пользователь соединения;
-#  --password		пароль MySQL-пользователя;
-#  --execute		выполнение операторов и выход
-RespStr=$(/usr/bin/mysql --user=Пользователь_мониторинга --password=Пароль_мониторинга --execute "SHOW SLAVE STATUS\G" 2>/dev/null)
-# Статистика недоступна - возврат статуса сервиса - 'не работает'
+# Getting the statistics line. mysql options:
+# --user MySQL connection user;
+# --password MySQL user password;
+# --execute statement execution and exit
+RespStr=$(/usr/bin/mysql --user=Monitoring_user --password=Monitoring_password --execute "SHOW SLAVE STATUS\G" 2>/dev/null)
+# No statistics available - returning service status - 'does not work'
 [ $? != 0 -o ! "$RespStr" ] && echo 0 && exit 1
 
-# Фильтрация, форматирование и отправка данных статистики серверу Zabbix
+# Filtering, formatting and sending statistics data to Zabbix server
 (cat <<EOF
 $RespStr
 EOF
@@ -20,6 +20,6 @@ EOF
  sub("NULL", 0, $2);
  print "- mysql.slave." $1, $2
 }' | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
-# Возврат статуса сервиса - 'работает'
+# Returning the status of the service - 'works'
 echo 1
 exit 0

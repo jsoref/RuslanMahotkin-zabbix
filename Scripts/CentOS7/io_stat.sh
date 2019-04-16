@@ -1,21 +1,21 @@
 #!/bin/bash
-# Отправка статистики дискового ввода-вывода на сервер Zabbix
+# Sending disk I / O statistics to Zabbix server
 
 
-# В командной строке нет параметров - отправка данных
+# There are no parameters in the command line - sending data
 if [ -z $1 ]; then
- # Получение строки статистики. Параметры iostat:
- #  -d	статистика использования устройств;
- #  -k	статистика в килобайтах в секунду;
- #  -x	расширенная статистика;
- #  -y	пропуск первой статистики(с момента загрузки);
- #  5	время в секундах между отчетами;
- #  1	количество отчетов
+  # Getting the statistics line. Iostat options:
+  # -d device usage statistics;
+  # -k statistics in kilobytes per second;
+  # -x extended statistics;
+  # -y skip the first statistics (from the moment of loading);
+  # 5 time in seconds between reports;
+  # 1 number of reports
  RespStr=$(/usr/bin/iostat -dkxy 5 1 2>/dev/null)
- # Статистика недоступна - возврат статуса сервиса - 'не работает'
+ # No statistics available - returning service status - 'does not work'
  [ $? != 0 ] && echo 0 && exit 1
 
- # Фильтрация, форматирование и отправка данных статистики серверу Zabbix
+ # Filtering, formatting and sending statistics data to Zabbix server
  (cat <<EOF
 $RespStr
 EOF
@@ -25,22 +25,22 @@ EOF
   if(NF == 14)
    for(i = 2; i <= 14; i++) print "- iostat."aParNames[i]"["$1"]", $i
  }' | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
- # Возврат статуса сервиса - 'работает'
+ # Returning the status of the service - 'works'
  echo 1
  exit 0
 
-# Обнаружение дисков
+# Disk detection
 elif [ "$1" = 'disks' ]; then
- # Строка списка дисков
+ # Disk list string
  DiskStr=`/usr/bin/iostat -d | awk '$1 ~ /^[hsv]d[a-z]$/ {print $1}'`
- # Разделитель JSON-списка имен
+ # Separator for JSON list of names
  es=''
- # Обработка списка дисков
+ # Processing the list of disks
  for disk in $DiskStr; do
-  # JSON-форматирование имени диска в строке вывода
+  # JSON formatting of the drive name in the output string
   OutStr="$OutStr$es{\"{#DISKNAME}\":\"$disk\"}"
   es=","
  done
- # Вывод списка дисков в формате JSON
+ # List of disks in JSON format
  echo -e "{\"data\":[$OutStr]}"
 fi

@@ -1,25 +1,25 @@
 #!/bin/sh
-# Отправка статистики сервера Postfix на сервер Zabbix
+# Sending Postfix server statistics to Zabbix server
 
-# Получение строки статистики. Параметры logtail.sh:
-#  -l			полное имя файла журнала
-#  -o			полное имя файла смещения
-# Параметры pflogsumm:
-#  -h			количество строк топа в отчете по хостам; 0 - не
-#			создается;
-#  -u			количество строк топа в отчете по пользователям; 0 - не
-#			создается;
-#  --mailq		выполнение команды mailq в конце отчета;
-#  --no_bounce_detail, --no_deferral_detail, --no_reject_detail
-#			скрытие детальных отчетов;
-#  --no_no_msg_size	отключение отчета по сообщениям без размера данных;
-#  --no_smtpd_warnings	отключение отчета по SMTPD-предупреждениям;
-#  --smtpd_stats	статистика SMTPD-соединений
+# Getting the statistics line. Parameters logtail.sh:
+# -l full log file name
+# -o full offset file name
+# Pflogsumm parameters:
+# -h is the number of lines in the host report; 0 - not
+# created;
+# -u the number of lines of the top in the user report; 0 - not
+# created;
+# --mailq mailq command execution at the end of the report;
+# --no_bounce_detail, --no_deferral_detail, --no_reject_detail
+# hide detailed reports;
+# --no_no_msg_size disable report on messages without data size;
+# --no_smtpd_warnings disabling a report on SMTPD warnings;
+# - smtpd_stats SMTPD Connection Statistics
 RespStr=$(sudo /etc/zabbix/logtail.pl -l /var/log/maillog -o /tmp/postfix_stat.dat | /usr/sbin/pflogsumm -h 0 -u 0 --mailq --no_bounce_detail --no_deferral_detail --no_no_msg_size --no_reject_detail --no_smtpd_warnings --smtpd_stats 2>/dev/null)
-# Статистика недоступна - возврат статуса сервиса - 'не работает'
+# No statistics available - returning service status - 'does not work'
 [ $? != 0 ] && echo 0 && exit
 
-# Фильтрация, форматирование и отправка данных статистики серверу Zabbix
+# Filtering, formatting and sending statistics data to Zabbix server
 (cat <<EOF
 $RespStr
 EOF
@@ -41,6 +41,6 @@ EOF
  }
  END { for(p in par) print "- postfix.queue." p, par[p] }
 ' | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
-# Возврат статуса сервиса - 'работает'
+# Returning the status of the service - 'works'
 echo 1
 exit 0

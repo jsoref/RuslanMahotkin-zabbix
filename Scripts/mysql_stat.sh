@@ -1,16 +1,16 @@
 #!/bin/bash
-# Отправка статистики сервера MySQL на сервер Zabbix
+# Sending MySQL server statistics to Zabbix server
 
-# Получение строки статистики. Параметры mysqladmin:
-#  --silent		'тихий' выход при невозможности установить соединение;
-#  --user		MySQL-пользователь соединения;
-#  --password		пароль MySQL-пользователя;
-#  extended-status	вывод переменных состояния сервера
-RespStr=$(/usr/bin/mysqladmin --silent --user=Пользователь_мониторинга --password=Пароль_мониторинга extended-status 2>/dev/null)
-# Статистика недоступна - возврат статуса сервиса - 'не работает'
+# Getting the statistics line. Parameters mysqladmin:
+# --silent 'silent' exit if connection cannot be established;
+# --user MySQL connection user;
+# --password MySQL user password;
+# extended-status output of server state variables
+RespStr=$(/usr/bin/mysqladmin --silent --user=Monitoring_user --password=Monitoring_password extended-status 2>/dev/null)
+# No statistics available - returning service status - 'does not work'
 [ $? != 0 ] && echo 0 && exit 1
 
-# Фильтрация, форматирование и отправка данных статистики серверу Zabbix
+# Filtering, formatting and sending statistics data to Zabbix server
 (cat <<EOF
 $RespStr
 EOF
@@ -18,6 +18,6 @@ EOF
  gsub(" ", "", $2);
  print "- mysql." $2, int($3)
 }' | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
-# Возврат статуса сервиса - 'работает'
+# Returning the status of the service - 'works'
 echo 1
 exit 0

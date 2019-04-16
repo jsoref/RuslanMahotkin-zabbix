@@ -1,16 +1,16 @@
 #!/bin/bash
-# Отправка статистики сервера Redis на сервер Zabbix
+# Sending Redis server statistics to Zabbix server
 
-# Получение строки статистики. Параметры redis-cli:
-#  -s сокет	полное имя файла сокета;
-#  info all	команда получения всей информации и статистики	
-RespStr=$(/usr/bin/redis-cli -s /полное/имя/файла/сокета info all 2>/dev/null)
-# Статистика недоступна - возврат статуса сервиса - 'не работает'
+# Getting the statistics line. Redis-cli options:
+# -s socket is the full name of the socket file;
+# info all command to get all the information and statistics
+RespStr=$(/usr/bin/redis-cli -s /full/name/file/socket info all 2>/dev/null)
+# No statistics available - returning service status - 'does not work'
 [ $? != 0 ] && echo 0 && exit 1
 
-# В командной строке нет параметров - отправка данных
+# There are no parameters in the command line - sending data
 if [ -z $1 ]; then
- # Фильтрация, форматирование и отправка данных статистики серверу Zabbix
+ # Filtering, formatting and sending statistics data to Zabbix server
  (cat <<EOF
 $RespStr
 EOF
@@ -25,13 +25,13 @@ EOF
   split($2, C, ",|=")
   for(i=1; i < 6; i+=2) print "- redis." C[i] "[" $1 "]", int(C[i+1])
  }' | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
- # Возврат статуса сервиса - 'работает'
+ # Returning the status of the service - 'works'
  echo 1
  exit 0
 
-# Обнаружение БД
+# DB detection
 elif [ "$1" = 'db' ]; then
- # Формирование списка БД в формате JSON
+ # Forming a list of databases in JSON format
  (cat <<EOF
 $RespStr
 EOF
