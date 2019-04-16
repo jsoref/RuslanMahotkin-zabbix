@@ -4,12 +4,12 @@
 CurlAPI(){
 # Request for ElasticSearch API
 
- # Curl options:
+# Curl options:
  # --max-time Maximum operation time in seconds;
  # --no-keepalive disabling keepalive messages on a TCP connection;
  # --silent disable load indicators and error messages;
  RespStr=$(/usr/bin/curl --max-time 20 --no-keepalive --silent "http://127.0.0.1:9200/$1" | /etc/zabbix/JSON.sh -l 2>/dev/null)
- # No statistics available - returning service status - 'does not work'
+# No statistics available - returning service status - 'does not work'
  [ $? != 0 ] && echo 0 && exit 1
 }
 

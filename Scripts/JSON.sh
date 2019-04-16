@@ -95,7 +95,7 @@ tokenize () {
   local KEYWORD='null|false|true'
   local SPACE='[[:space:]]+'
 
-  # Force zsh to expand $A into multiple words
+# Force zsh to expand $A into multiple words
   local is_wordsplit_disabled=$(unsetopt 2>/dev/null | grep -c '^shwordsplit$')
   if [ $is_wordsplit_disabled != 0 ]; then setopt shwordsplit; fi
   $GREP "$STRING|$NUMBER|$KEYWORD|$SPACE|." | egrep -v "^$SPACE$"
@@ -168,10 +168,10 @@ parse_value () {
   case "$token" in
     '{') parse_object "$jpath" ;;
     '[') parse_array  "$jpath" ;;
-    # At this point, the only valid single-character tokens are digits.
+# At this point, the only valid single-character tokens are digits.
     ''|[!0-9]) throw "EXPECTED value GOT ${token:-EOF}" ;;
     *) value=$token
-       # if asked, replace solidus ("\/") in json strings with normalized value: "/"
+# if asked, replace solidus ("\/") in json strings with normalized value: "/"
        [ "$NORMALIZE_SOLIDUS" -eq 1 ] && value=$(echo "$value" | sed 's#\\/#/#g')
        isleaf=1
        [ "$value" = '""' ] && isempty=1

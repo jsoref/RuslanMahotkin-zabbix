@@ -10,7 +10,7 @@ RespStr=$(/usr/bin/redis-cli -s /full/name/file/socket info all 2>/dev/null)
 
 # There are no parameters in the command line - sending data
 if [ -z $1 ]; then
- # Filtering, formatting and sending statistics data to Zabbix server
+# Filtering, formatting and sending statistics data to Zabbix server
  (cat <<EOF
 $RespStr
 EOF
@@ -25,13 +25,13 @@ EOF
   split($2, C, ",|=")
   for(i=1; i < 6; i+=2) print "- redis." C[i] "[" $1 "]", int(C[i+1])
  }' | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
- # Returning the status of the service - 'works'
+# Returning the status of the service - 'works'
  echo 1
  exit 0
 
 # DB detection
 elif [ "$1" = 'db' ]; then
- # Forming a list of databases in JSON format
+# Forming a list of databases in JSON format
  (cat <<EOF
 $RespStr
 EOF

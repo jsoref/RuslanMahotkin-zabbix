@@ -4,7 +4,7 @@
 CurlAPI(){
 # Request to PabbitMQ API
 
- # Curl options:
+# Curl options:
  # --max-time Maximum operation time in seconds;
  # --no-keepalive disabling keepalive messages on a TCP connection;
  # --silent disable load indicators and error messages;
@@ -13,7 +13,7 @@ CurlAPI(){
  # - tlsv1.2 using TLSv1.2;
  # --user 'user: password' authentication on server
  RespStr=$(/usr/bin/curl --max-time 20 --no-keepalive --silent --ciphers ecdhe_rsa_aes_128_gcm_sha_256 --insecure --tlsv1.2 --user Monitoring_user:Monitoring_password "https://127.0.0.1:15672/api/$1" | /etc/zabbix/JSON.sh -l 2>/dev/null)
- # No statistics available - returning service status - 'does not work'
+# No statistics available - returning service status - 'does not work'
  [ $? != 0 ] && echo 0 && exit 1
 }
 
@@ -24,49 +24,49 @@ OutStr=''
 IFS=$'\n'
 # There are no parameters in the command line - sending data
 if [ -z $1 ]; then
- # General Statistics
+# General Statistics
  CurlAPI 'overview?columns=message_stats,queue_totals,object_totals'
- # Formatting general statistics data in the output line
+# Formatting general statistics data in the output line
  for par in $RespStr; do
   OutStr="$OutStr- rabbitmq.${par/	/ }\n"
  done
 
- # Queue list
+# Queue list
  CurlAPI 'queues?columns=name'
  QueueStr=$RespStr
- # Processing the queue list
+# Processing the queue list
  for q in $QueueStr; do
-  # Queue name
+# Queue name
   qn=${q#*	}
-  # Queue statistics
+# Queue statistics
   CurlAPI "queues/%2f/$qn?columns=message_stats,memory,messages,messages_ready,messages_unacknowledged,consumers"
-  # Formatting queue statistics data in the output string
+# Formatting queue statistics data in the output string
   for par in $RespStr; do
    OutStr="$OutStr- rabbitmq.${par%%	*}[$qn] ${par#*	}\n"
   done
  done
 
- # Sending output line to Zabbix server. Parameters for zabbix_sender:
+# Sending output line to Zabbix server. Parameters for zabbix_sender:
  # --config agent configuration file;
  # --host hostname on Zabbix server;
  # --input-file data file ('-' - standard input)
  echo -en $OutStr | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
- # Returning the status of the service - 'works'
+# Returning the status of the service - 'works'
  echo 1
  exit 0
 
 # Queue detection
 elif [ "$1" = 'queues' ]; then
- # Queue list
+# Queue list
  CurlAPI 'queues?columns=name'
- # Separator for JSON list of names
+# Separator for JSON list of names
  es=''
- # Processing the queue list
+# Processing the queue list
  for q in $RespStr; do
-  # JSON formatting queue name in output string
+# JSON formatting queue name in output string
   OutStr="$OutStr$es{\"{#QUEUENAME}\":\"${q#*	}\"}"
   es=","
  done
- # Listing queues in JSON format
+# Listing queues in JSON format
  echo -e "{\"data\":[$OutStr]}"
 fi

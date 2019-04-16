@@ -36,27 +36,27 @@ iAwk=1
 IFS=$'\n'
 # Output line
 OutStr=$(
- # Line by line processing the results of command execution
+# Line by line processing the results of command execution
  for rs in $ResStr; do
-  # Position to start next line in result row
+# Position to start next line in result row
   let "pos+=${#rs}+1"
-  # Command line output message
+# Command line output message
   if [ "${rs}" = "Message: Command output follows"$'\r' ]; then
-   # Save the position of the start of the result substring in the result string
+# Save the position of the start of the result substring in the result string
    begin=$pos
-  # End string of substring of the result of the command execution
+# End string of substring of the result of the command execution
   elif [[ "${rs:0:7}" != 'Output:' && -n "$begin" ]]; then
-   # Running an awk program on a substring of the result of the command execution
+# Running an awk program on a substring of the result of the command execution
    (cat <<EOF
 ${ResStr:$begin:$pos-$begin}
 EOF
    ) | awk "${aComAwk[iAwk]}"
-   # Switching the index of an awk program line in an array to the next
+# Switching the index of an awk program line in an array to the next
    let "iAwk+=2"
-   # Clear position of the start of the result substring in the result string
+# Clear position of the start of the result substring in the result string
    begin=
   fi
- # Insert at the beginning of each line
+# Insert at the beginning of each line
  done | awk '{ print "- asterisk."$0 }'
 )
 

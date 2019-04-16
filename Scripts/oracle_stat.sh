@@ -13,7 +13,7 @@ column retvalue format a15
 $1
 EOF
 )
- # Mistake
+# Mistake
  [ $? != 0 ] && exit 1
 }
 
@@ -23,59 +23,59 @@ EOF
 
 # There are no parameters in the command line - database detection
 if [ -z $1 ]; then
- # Getting the string of the list of database names
+# Getting the string of the list of database names
  DBStr=$(awk -F: '$1~/^[A-Za-z]+$/ { print $1 }' /etc/oratab 2>/dev/null)
- # Mistake
+# Mistake
  [ $? != 0 ] && exit 1
- # JSON list delimiter
+# JSON list delimiter
  es=''
- # List processing
+# List processing
  for db in $DBStr; do
-  # JSON formatting of the name in the output string
+# JSON formatting of the name in the output string
   OutStr="$OutStr$es{\"{#DBNAME}\":\"$db\"}"
   es=","
  done
- # List output in JSON format
+# List output in JSON format
  echo "{\"data\":[$OutStr]}"
 
 # Tablespace detection
 elif [ "$1" = 'tablespaces' ]; then
- # Getting the string of the list of database names
+# Getting the string of the list of database names
  DBStr=$(awk -F: '$1~/^[A-Za-z]+$/ { print $1 }' /etc/oratab 2>/dev/null)
- # Mistake
+# Mistake
  [ $? != 0 ] && exit 1
- # JSON list delimiter
+# JSON list delimiter
  es=''
- # List processing
+# List processing
  for db in $DBStr; do
-  # SID DB
+# SID DB
   export ORACLE_SID=$db
-  # Getting a list of tablespace names
+# Getting a list of tablespace names
   ExecSql 'SELECT tablespace_name FROM dba_tablespaces;'
-  # List processing
+# List processing
   for ts in $ResStr; do
-   # JSON formatting of the name in the output string
+# JSON formatting of the name in the output string
    OutStr="$OutStr$es{\"{#DBNAME}\":\"$db\",\"{#TSNAME}\":\"$ts\"}"
    es=","
   done
  done
- # List output in JSON format
+# List output in JSON format
  echo "{\"data\":[$OutStr]}"
 
 # DB statistics
 else
- # SID DB
+# SID DB
  db=$1
  export ORACLE_SID=$1
 
- # Formats output numbers
+# Formats output numbers
  fmint='FM99999999999999990'
  fmfloat='FM99999990.9999'
- # SQL substrings for obtaining statistics values
+# SQL substrings for obtaining statistics values
  ValueSysStatStr=" to_char(value, '$fmint') FROM v\$sysstat WHERE name = "
  TimeWaitedSystemEventStr=" to_char(time_waited, '$fmint') FROM v\$system_event se, v\$event_name en WHERE se.event(+) = en.name AND en.name = "
  ValueResourceLimitStr=" '$fmint') FROM v\$resource_limit WHERE resource_name = "
- # SQL array of data element values
+# SQL array of data element values
  aParSql=(
 "'checkactive', to_char(case when inst_cnt > 0 then 1 else 0 end,'$fmint')
   FROM  (select count(*) inst_cnt FROM v\$instance
@@ -158,24 +158,24 @@ else
 "'latchfree',$TimeWaitedSystemEventStr'latch free'"
  )
 
- # Forming a string of queries for the values of data elements from an array
+# Forming a string of queries for the values of data elements from an array
  SqlStr=''
  for p in "${aParSql[@]}"; do
   SqlStr="${SqlStr}SELECT ${p};
 "
  done
 
- # Receiving and adding to the output line the values of data elements
+# Receiving and adding to the output line the values of data elements
  OutStr=''
  ExecSql "$SqlStr"
- # Field separator in the input line - for line-by-line processing
+# Field separator in the input line - for line-by-line processing
  IFS=$'\n'
  for par in $ResStr; do
-  # Validation of the value
+# Validation of the value
   [ $par == ${par#* } ] || OutStr="$OutStr- oracle.${par%% *}[$db] ${par#* }\n"
  done
 
- # Retrieving data on tablespaces
+# Retrieving data on tablespaces
  ExecSql "SELECT df.tablespace_name || ' ' || totalspace || ' ' || nvl(freespace, 0)
   FROM
   (SELECT tablespace_name, SUM(bytes) totalspace
@@ -194,22 +194,22 @@ else
     FROM v\$sort_segment) ss
   WHERE tf.tablespace_name = ss.tablespace_name;"
 
- # Adding data on table spaces to the output string
+# Adding data on table spaces to the output string
  for par in $ResStr; do
-  # Name of tablespace
+# Name of tablespace
   ts=${par%% *}
-  # Allocation of full and free table space sizes
+# Allocation of full and free table space sizes
   par=${par#* }
   OutStr="$OutStr- oracle.tablespace.size[$db,$ts] ${par%% *}\n"
   OutStr="$OutStr- oracle.tablespace.free[$db,$ts] ${par#* }\n"
  done
 
- # Sending output line to Zabbix server. Parameters for zabbix_sender:
+# Sending output line to Zabbix server. Parameters for zabbix_sender:
  # --config agent configuration file;
  # --host hostname on Zabbix server;
  # --input-file data file ('-' - standard input)
  echo -en $OutStr | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
- # Returning the status of the service - 'works'
+# Returning the status of the service - 'works'
  echo 1
  exit 0
 fi
