@@ -545,7 +545,7 @@ Agent restart
 service zabbix-agent restart
 ```
 
-## RabbitMQ, mytemplate-rabbitmq-trap.xml template
+## RabbitMQ, mytemplate-rabbitmq.xml template
 
 Scenario of sending RabbitMQ server statistics to Zabbix server
 
@@ -787,7 +787,7 @@ UserParameter=postgresql.discovery_databases, powershell -File "c:\Scripts\postg
 Agent restart
 `Services - Zabbix Agent - Restart Service`
 
-## RabbitMQ, mytemplate-rabbitmq-trap.xml template
+## RabbitMQ, mytemplate-rabbitmq.xml template
 
 Erlang `otp_win64_19.0.exe` is assumed.
 
