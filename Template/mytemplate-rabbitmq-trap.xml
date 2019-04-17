@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
     <version>3.4</version>
-    <date>2019-04-17T18:41:50Z</date>
+    <date>2019-04-17T21:08:39Z</date>
     <groups>
         <group>
             <name>Templates</name>
@@ -1241,7 +1241,7 @@
     </templates>
     <triggers>
         <trigger>
-            <expression>{RabbitMQ:rabbitmq_status.last(0)}&lt;1</expression>
+            <expression>{RabbitMQ:rabbitmq_status.last(0)}&lt;1 and {RabbitMQ:rabbitmq_status.last(,5m)}&lt;1</expression>
             <recovery_mode>0</recovery_mode>
             <recovery_expression/>
             <name>RabbitMQ: service down on {HOSTNAME}</name>
