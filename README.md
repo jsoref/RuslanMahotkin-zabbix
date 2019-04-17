@@ -609,7 +609,8 @@ rabbitmqctl set_permissions Monitoring_user '' '' ''
 `/etc/zabbix/zabbix_agentd.conf` - script connection to zabbix agent
 
 ```
-UserParameter=rabbitmq_status,/etc/zabbix/rabbitmq_stat.sh
+UserParameter=rabbitmq_stats,/etc/zabbix/rabbitmq_stat.sh
+UserParameter=rabbitmq_queue_stats[*],/etc/zabbix/rabbitmq_stat.sh queue $1
 UserParameter=rabbitmq.discovery_queues,/etc/zabbix/rabbitmq_stat.sh queues
 ```
 

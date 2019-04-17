@@ -31,30 +31,25 @@ if [ -z $1 ]; then
   OutStr="$OutStr- rabbitmq.${par/	/ }\n"
  done
 
-# Queue list
- CurlAPI 'queues?columns=name'
- QueueStr=$RespStr
-# Processing the queue list
- for q in $QueueStr; do
-# Queue name
-  qn=${q#*	}
-# Queue statistics
-  CurlAPI "queues/%2f/$qn?columns=message_stats,memory,messages,messages_ready,messages_unacknowledged,consumers"
-# Formatting queue statistics data in the output string
-  for par in $RespStr; do
-   OutStr="$OutStr- rabbitmq.${par%%	*}[$qn] ${par#*	}\n"
-  done
- done
-
 # Sending output line to Zabbix server. Parameters for zabbix_sender:
  # --config agent configuration file;
  # --host hostname on Zabbix server;
  # --input-file data file ('-' - standard input)
- echo -en $OutStr | /usr/bin/zabbix_sender --config /etc/zabbix/zabbix_agentd.conf --host=`hostname` --input-file - >/dev/null 2>&1
+ echo -en $OutStr
 # Returning the status of the service - 'works'
  echo 1
  exit 0
 
+# per queue data
+elif [ "$1" = 'queue' ]; then
+ qn="$2"
+ CurlAPI "queues/%2f/$qn?columns=message_stats,memory,messages,messages_ready,messages_unacknowledged,consumers"
+  for par in $RespStr; do
+   OutStr="$OutStr- rabbitmq.$(echo $par|cut -f1)[$qn] $(echo $par|cut -f2)\n"
+  done
+ echo -en $OutStr
+ echo 1
+ exit 0
 # Queue detection
 elif [ "$1" = 'queues' ]; then
 # Queue list
